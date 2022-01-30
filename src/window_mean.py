@@ -2,9 +2,16 @@
 import numpy as np
 import pandas as pd
 import sys
+import os
+import logging
 import time
 #import matplotlib.pyplot as plt
 ##================================================================================================
+
+#global logger
+#log = logging.getLogger(__name__)
+
+
 ## Parameters:
 np.random.seed(1)
 window_size = 50
@@ -88,4 +95,24 @@ for i in range(n_windows):
 np.savetxt("window_mean_HE%s_chrm%s_ia%s.txt"%(i_HE, i_chrm, ia), window_mean, fmt="%f")
 #print("finished -- ia: {}, time: {:.2f}".format(ia, time.time() - start_time))
 
+def main(args):
+    """Main logic of program."""
 
+if __name__ == "__main__":
+
+    import argparse
+
+    #set up logging
+    #logging.basicConfig(filename='./vcf_to_structure.log', level=logging.INFO,
+    #                    format='%(asctime)s %(messages)s')
+
+    #parse command line arguments
+    parser = argparse.ArgumentParser(description='Converts a vcf file output\
+                                     by GATK to a structure input format')
+    #positional arguments
+    parser.add_argument('in_file', help='Input vcf file')
+
+    args = parser.parse_args()
+
+    #run program
+    main(args)
