@@ -1,5 +1,7 @@
 import torch
 from torch.utils.data import Dataset
+from torch.utils.data import DataLoader, random_split
+
 import torch.nn as nn
 import torch.nn.functional as F
 import torch.optim as optim
@@ -49,7 +51,13 @@ class MethDataset(Dataset):
 
 
 if __name__ == '__main__':
-    dataset = MethDataset('/home/mce03b/methylation_nlp/test/data/window_mean_HE1_chrm11_iaN7_win50_step25.txt')
-    print(len(dataset))
-    print(dataset[1])
-    print(dataset[:])
+    dataset = MethDataset('/datasets/work/af-mlai-bio/work/Heat_Stress_Use-case/users/mce03b/methylation_nlp/analysis/window_mean_HE1_chrm2_iaN7_win50_step25.txt')
+    trainset, valset = random_split(dataset, [round(len(dataset)*0.7), round(len(dataset)*0.3)])
+    train_loader = DataLoader(trainset, batch_size=10, shuffle=True, num_workers=2)
+    val_loader = DataLoader(valset, batch_size=10, shuffle=True, num_workers=2)
+
+    for i, batch in enumerate(train_loader):
+        print(i, batch)
+
+    for i, batch in enumerate(val_loader):
+        print(i, batch)

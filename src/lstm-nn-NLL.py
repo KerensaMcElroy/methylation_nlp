@@ -29,9 +29,10 @@ class MethDataset(Dataset):
         self.o_data = np.loadtxt(src_file, max_rows=num_rows,
             usecols=3, delimiter=" ",
             skiprows=0, dtype='U50')
-        self.m_data = np.loadtxt(src_file, max_rows=num_rows,
+        cont_meth = np.loadtxt(src_file, max_rows=num_rows,
             usecols=2, delimiter=" ", skiprows=0,
             dtype=np.float32)
+        self.m_data = np.where(cont_meth > 0, 1, 0)
         self.s_data = np.loadtxt(src_file, max_rows=num_rows,
             usecols=0, delimiter=" ",
             skiprows=0, dtype=np.int32)
@@ -44,7 +45,7 @@ class MethDataset(Dataset):
 
     def __getitem__(self, idx):
         oligo = self.o_data[idx]
-        meth = self.m_data[idx]
+        meth = [self.m_data[idx]]
         start = self.s_data[idx]
         end = self.e_data[idx]
     
@@ -61,11 +62,6 @@ trainset, valset = random_split(dataset, [round(len(dataset)*0.9), round(len(dat
 train_loader = DataLoader(trainset, batch_size=1, shuffle=True, num_workers=1)
 val_loader = DataLoader(valset, batch_size=1, shuffle=True, num_workers=1)
 
-#training_data = [
-#    # Tags are now continuous on [0,1]
-#    (["AATCGAT","GGCTGTG","ATGCTGA","GGGGCGG"], [.2,.94,.05,.75]),
-#    (["GGCGGCC","AGTGGCG","GGGTATA","ATGCCGT"], [.82,.64,.98,.32])
-#]
 
 
 nuc_to_ix = {"A":0,"T":1,"G":2,"C":3}
@@ -92,7 +88,7 @@ class LSTMTagger(nn.Module):
             nn.ReLU(),
             nn.Linear(nn_dim, nn_dim),
             nn.ReLU(),
-            nn.Linear(nn_dim,1),
+            nn.Linear(nn_dim,2),
         )
 
     def init_hidden(self, size):
@@ -106,17 +102,19 @@ class LSTMTagger(nn.Module):
         nuc_lstm_out, self.nuc_hidden = self.nuc_lstm(nuc_embeds.view(len(nuc_sequence), 1, -1), self.nuc_hidden)
 
         x = self.flatten(nuc_lstm_out[-1])
-        score = self.linear_relu_stack(x)
-        return score
+        tag_space = self.linear_relu_stack(x)
+        tag_scores = F.log_softmax(tag_space, dim=1)
+        return tag_scores
 
-NN_DIM = 20
-NUC_EMBEDDING_DIM = 20
-NUC_HIDDEN_DIM = 20
+NN_DIM = 4
+NUC_EMBEDDING_DIM = 4
+NUC_HIDDEN_DIM = 50
 model = LSTMTagger(NUC_EMBEDDING_DIM, NUC_HIDDEN_DIM, NN_DIM,
                    len(nuc_to_ix))
 
-loss_function = nn.MSELoss()
-optimizer = optim.SGD(model.parameters(), lr=0.01)
+weights = torch.tensor([.001,.999])
+loss_function = nn.CrossEntropyLoss(weight=weights)
+optimizer = optim.SGD(model.parameters(), lr=0.005)
 
 #with torch.no_grad():
 #    for i, (oligo, meth, start, end) in enumerate(train_loader):
@@ -161,16 +159,19 @@ for i, (oligo, meth, start, end) in enumerate(train_loader):
     predict_meth, loss = train(target_meth, oligo_tensor)
     current_loss += loss
 
- #   if i % print_every == 0:
- #       print('%d %d%% (%s) %.4f %s / %s' % (i, i / num_train * 100, timeSince(start), loss, predict_meth[0], target_meth))
-
-    if i % plot_every == 0:
-        mean_loss = current_loss/plot_every
-        print(mean_loss)
+ #   if i % plot_every == 0:
+ #       mean_loss = current_loss/plot_every
+ #       print(mean_loss)
+ #       current_loss = 0
+    if target_meth.item()==1:
+         print('%d %d%% (%s) %.4f %s / %s' % (i, i / num_train * 100, timeSince(start), loss, predict_meth, target_meth))
+ #  if i % plot_every == 0:
+  #      mean_loss = current_loss/plot_every
+  #      print(mean_loss)
     # Add current loss avg to list of losses
-    if i % plot_every == 0:
-        all_losses.append(current_loss / plot_every)
-        current_loss = 0
+  #  if i % plot_every == 0:
+  ##      all_losses.append(current_loss / plot_every)
+   #     current_loss = 0
 
 plt.figure()
 plt.plot(all_losses)
