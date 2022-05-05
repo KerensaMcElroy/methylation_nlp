@@ -31,8 +31,6 @@ class DnaMethylation(torch.utils.data.Dataset):
     def balance(self, binary_meth):
         weights = np.copy(binary_meth)
         num_pos = sum(binary_meth)
-        print(binary_meth)
-        print(num_pos)
         zero_indicies = np.where(binary_meth == 0)[0].tolist()
         if  len(zero_indicies) >= num_pos:
             zero_subset = random.sample(zero_indicies, num_pos)
@@ -72,10 +70,11 @@ train_loader = DataLoader(positive_data, batch_size=b_size, shuffle=True)
 #defining the network
 from torch import nn
 import torch.nn.functional as F
+import torch.optim as optim
 
 class LSTMTagger(nn.Module):
 
-    def __init__(self, embedding_dim, hidden_dim, relu_dim, oligo_set_size):
+    def __init__(self, embedding_dim, hidden_dim, oligo_set_size):
         super(LSTMTagger, self).__init__()
         self.hidden_dim = hidden_dim
         self.oligo_embeddings = nn.Embedding(oligo_set_size, embedding_dim)
@@ -85,49 +84,36 @@ class LSTMTagger(nn.Module):
         self.lstm = nn.LSTM(embedding_dim, hidden_dim, batch_first=True)
 
         # The linear layer that maps from hidden state space to tag space
-        #self.hidden2tag = nn.Linear(hidden_dim, 2)
-        self.linear_relu_stack = nn.Sequential(     #trying a relu stack instead
-            nn.Linear(hidden_dim, relu_dim),
-            nn.ReLU(),
-            nn.Linear(relu_dim, relu_dim),
-            nn.ReLU(),
-            nn.Linear(relu_dim,1),
-        )
-       # self.sigmoid = nn.Sigmoid()
-        x = self.flatten(nuc_lstm_out[-1])
-        tag_space = self.linear_relu_stack(x)
-        tag_scores = F.log_softmax(tag_space, dim=1)
-
+        self.hidden2tag = nn.Linear(hidden_dim, 2)
+      
+    def forward(self, fragment):
+        embeds = self.oligo_embeddings(fragment)
+        lstm_out, _ = self.lstm(embeds)
+        tag_space = self.hidden2tag(lstm_out)
+        tag_scores = F.log_softmax(tag_space, dim=2)
         return tag_scores
 
-    def forward(self, fragment):
-       # print('fragment shape:',fragment.shape)
-        embeds = self.oligo_embeddings(fragment)
-       # print(len(fragment))
-       # print('embed shape:',embeds.shape)
-        lstm_out, _ = self.lstm(embeds)
-       # print('lstm shape:', lstm_out.shape)
-        linear_out = self.linear_relu_stack(lstm_out)
-        probs = self.sigmoid(linear_out)
-
-       # print('tagspace shape:' ,tag_space.shape)
-        #tag_scores = F.log_softmax(tag_space, dim=1)
-        #print('tag_scores shape:',tag_scores.shape)
-        #print('tagscores:',tag_scores)
-        return probs
-
 #hyper parameters
-embedding_dim = 20
-hidden_dim = 200
-relu_dim = 10
-learning_rate = 0.01
-epochs = 1000
+EMBEDDING_DIM = 20
+HIDDEN_DIM = 20
+LEARNING_RATE = 0.01
+EPOCHS = 100
 
+#train the model
+model = LSTMTagger(EMBEDDING_DIM, HIDDEN_DIM, len(dataset.uniq_oligos))
 
+loss_function = nn.NLLLoss()
+optimizer = optim.SGD(model.parameters(), lr=LEARNING_RATE)
 
-for j,(fragment_train,meth_train, weight) in enumerate(train_loader):
-    #print(j, fragment_train, meth_train, weight)
-    print(torch.sum(meth_train, dim=1))
-    print(torch.sum(weight, dim=1))
+for epoch in range(EPOCHS):
+    for j,(fragment_train, targets, weight) in enumerate(train_loader):
+        print(j)
+        model.zero_grad()
+        #calculate output
+        tag_scores = model(fragment_train)
+        loss = loss_function(tag_scores.view(-1,2), targets.view(-1)) #reshape required due to batch for NLLLoss
+        loss.backward()
+        optimizer.step()
+
 
 
