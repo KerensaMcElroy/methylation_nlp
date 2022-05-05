@@ -31,9 +31,14 @@ class DnaMethylation(torch.utils.data.Dataset):
     def balance(self, binary_meth):
         weights = np.copy(binary_meth)
         num_pos = sum(binary_meth)
-        zero_indices = np.where(binary_meth == 0)[0].tolist()
-        zero_subset = random.sample(zero_indices, num_pos)
-        weights[zero_subset] = 1
+        print(binary_meth)
+        print(num_pos)
+        zero_indicies = np.where(binary_meth == 0)[0].tolist()
+        if  len(zero_indicies) >= num_pos:
+            zero_subset = random.sample(zero_indicies, num_pos)
+            weights[zero_subset] = 1
+        else:
+            weights[zero_indicies] = 1
         return weights
     
     def __len__(self):
@@ -54,10 +59,15 @@ class DnaMethylation(torch.utils.data.Dataset):
 #parameters
 b_size = 64
 
-#create dataloader
+#create dataloader - only 1000bp windows with at least one meth site
 meth_file = 'window_mean_HE1_chrm11_iaN7_win10_step10_frag1000.txt'
 dataset = DnaMethylation(meth_file)
-train_loader = DataLoader(dataset, batch_size=b_size, shuffle=True)
+counts = torch.tensor(np.sum(dataset.meth, axis = 1))
+one_indices = torch.nonzero(counts).flatten().tolist()
+positive_data = torch.utils.data.Subset(dataset, one_indices)
+
+
+train_loader = DataLoader(positive_data, batch_size=b_size, shuffle=True)
 
 #defining the network
 from torch import nn
@@ -116,7 +126,7 @@ epochs = 1000
 
 
 for j,(fragment_train,meth_train, weight) in enumerate(train_loader):
-   # print(j, fragment_train, meth_train, weight)
+    #print(j, fragment_train, meth_train, weight)
     print(torch.sum(meth_train, dim=1))
     print(torch.sum(weight, dim=1))
 
