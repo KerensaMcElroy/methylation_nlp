@@ -102,16 +102,18 @@ EPOCHS = 100
 #train the model
 model = LSTMTagger(EMBEDDING_DIM, HIDDEN_DIM, len(dataset.uniq_oligos))
 
-loss_function = nn.NLLLoss()
+loss_function = nn.NLLLoss(reduce=False)
 optimizer = optim.SGD(model.parameters(), lr=LEARNING_RATE)
 
 for epoch in range(EPOCHS):
     for j,(fragment_train, targets, weight) in enumerate(train_loader):
-        print(j)
         model.zero_grad()
         #calculate output
         tag_scores = model(fragment_train)
+
         loss = loss_function(tag_scores.view(-1,2), targets.view(-1)) #reshape required due to batch for NLLLoss
+        loss = torch.mean(loss * weight.view(-1))
+        print(loss.item())
         loss.backward()
         optimizer.step()
 
