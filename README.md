@@ -15,3 +15,8 @@ Presented work to team. Comment was made that language has a natural grammar, wh
 
 04-05-22
 Will now try balancing by weighting a random selection of unmethylated windows to 1. All data is used to run the lstm but only methylated windows and a matching number of unmethylated windows used for the loss function.
+
+10-05-22
+Weighting via loss function now implemented. All evaluation metrics are terrible, but this is excellent because the model does not now converge to zero
+instantly, and we can work on actually improving the model.
+Probably need to give it more data at this point so will go back to working on scripts to format data. 

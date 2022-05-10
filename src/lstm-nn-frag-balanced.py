@@ -94,14 +94,16 @@ class LSTMTagger(nn.Module):
         return tag_scores
 
 #hyper parameters
-EMBEDDING_DIM = 20
-HIDDEN_DIM = 20
+EMBEDDING_DIM = 50
+HIDDEN_DIM = 200
 LEARNING_RATE = 0.01
-EPOCHS = 100
+EPOCHS = 300
 
 #train the model
-model = LSTMTagger(EMBEDDING_DIM, HIDDEN_DIM, len(dataset.uniq_oligos))
+from sklearn.metrics import confusion_matrix
 
+model = LSTMTagger(EMBEDDING_DIM, HIDDEN_DIM, len(dataset.uniq_oligos))
+CM=0
 loss_function = nn.NLLLoss(reduce=False)
 optimizer = optim.SGD(model.parameters(), lr=LEARNING_RATE)
 
@@ -113,9 +115,33 @@ for epoch in range(EPOCHS):
 
         loss = loss_function(tag_scores.view(-1,2), targets.view(-1)) #reshape required due to batch for NLLLoss
         loss = torch.mean(loss * weight.view(-1))
-        print(loss.item())
         loss.backward()
         optimizer.step()
 
+        #evaluations 
+        preds = torch.argmax(tag_scores, 2) # tag_scores.size() [64, 100, 2]
+        CM = confusion_matrix(targets.view(-1), preds.view(-1))
+        tn=CM[0][0]
+        tp=CM[1][1]
+        fp=CM[0][1]
+        fn=CM[1][0]
+        acc=np.sum(np.diag(CM)/np.sum(CM))
+        sensitivity=tp/(tp+fn)
+        precision=tp/(tp+fp)
+        
+#        print('\nAccuracy(mean): %f %%' % (100 * acc))
+#        print()
+#        print('Confusion Matirx : ')
+#        print(CM)
+        print('- Sensitivity : ',(tp/(tp+fn))*100, '- Specificity : ',(tn/(tn+fp))*100, '- Precision: ',(tp/(tp+fp))*100)
+#        print('- Specificity : ',(tn/(tn+fp))*100)
+#        print('- Precision: ',(tp/(tp+fp))*100)
+#        print('- NPV: ',(tn/(tn+fn))*100)
+#        print('- F1 : ',((2*sensitivity*precision)/(sensitivity+precision))*100)
+#        print()
+                
+#    return acc, CM
+
+#
 
 
