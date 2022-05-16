@@ -21,6 +21,8 @@ import math
 import os
 import logging
 import gzip
+import glob
+
 from Bio import SeqIO
 
 #global logging
@@ -31,12 +33,7 @@ logging.basicConfig(filename = 'window_func.log',
 
 logger = logging.getLogger()
 
-
-def make_windows(out_file, genome, win, slide, stress,chrom,animal):
-
-    df = pd.read_csv('/datasets/work/af-mlai-bio/work/Heat_Stress_Use-case/Data_for_Tai/filtered_meth_HE%s_chrm%s.dat'%(stress,chrom), sep="\s+")
-    logger.info("count data shape: %s", df.shape)
-
+def make_windows(genome, win, slide, chrom, animal, df):
     n_names = [col for col in df.columns if col.startswith('N')]
     logger.info("n_names: %s", n_names)
 
@@ -54,7 +51,6 @@ def make_windows(out_file, genome, win, slide, stress,chrom,animal):
     a = np.nan_to_num(a)
     logger.info("a.shape: %s", a.shape)
 
-##================================================================================================
     pos = df["Pos"]
     site_end = int(pos.max())
 
@@ -93,10 +89,27 @@ def make_windows(out_file, genome, win, slide, stress,chrom,animal):
         window_seq[i]=str(record.seq[int(window_beg[i]):int(window_end[i])])
         p += slide
         i+=1 
-
-    #print("finished -- ia: {}, time: {:.2f}".format(animal, time.time() - start_time))
+    print("finished -- ia: {}, time: {:.2f}".format(animal, time.time() - start_time))
     ta=np.array(list(zip(window_beg+1,window_end+1,window_mean,window_seq)), 'd,d,f,U200')
-    np.savetxt(out_file, ta, fmt="%d %d %.3f %s")
+    return ta
+
+
+def get_chroms(outfile, genome, win, slide, stress,chrom,animal):
+    path = '/datasets/work/af-mlai-bio/work/Heat_Stress_Use-case/Data_for_Tai/'
+    if chrom=='all':
+        file_list = glob.glob(path + 'filtered_meth_HE{}_chrm*.dat'.format(stress))
+        df_list = [pd.read_csv(file, sep="\s+") for file in file_list]
+    else:
+        file_list = glob.glob(path + 'filtered_meth_HE{}_chrm{}.dat'.format(stress, chrom))
+     
+    for file in file_list:
+        chrom = file.split('chrm')[1].split('.')[0]
+        print(chrom)
+        df = pd.read_csv(file, sep='\s+')
+        ta = make_windows(genome, win, slide, chrom, animal, df)
+        with open(outfile,'a') as out:
+            np.savetxt(out, ta, fmt="%d %d %.3f %s")
+    
 
 def get_out_file_name(stress, chrom, animal, win, slide):  
     return "window_mean_HE%s_chrm%s_ia%s_win%s_step%s.txt"%(stress, chrom, animal, win, slide)
@@ -120,7 +133,7 @@ def main(args):
 
     out_file = get_out_file_name(stress, chrom, animal, win, slide)
 
-    make_windows(out_file, genome, win, slide, stress, chrom, animal)
+    get_chroms(out_file, genome, win, slide, stress, chrom, animal)
     
 if __name__ == "__main__":
 
@@ -136,8 +149,10 @@ if __name__ == "__main__":
     parser.add_argument('win', help='Sliding window size', type=int)
     parser.add_argument('slide', help='Sliding window step', type=int)
     parser.add_argument("HE", help="Heat stress stage, one of [1,2,3]")
-    parser.add_argument("chrom", help="Chromosome id, from 1 to 29")
-    parser.add_argument("an", help="Animal id, one of [N1,N4,N7,N10,N13,N16,N19,N22,N25,N28,N31,N34,N40,Nj43]", type=str)
+    parser.add_argument("chrom", help="Chromosome id, from 1 to 29",\
+        default='all', type=str)
+    parser.add_argument("an", help="Animal id, one of NX where X is the identifier",\
+        default='all', type=str)
 
     args = parser.parse_args()
     #run program
