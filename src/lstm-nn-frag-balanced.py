@@ -58,7 +58,7 @@ class DnaMethylation(torch.utils.data.Dataset):
 b_size = 64
 
 #create dataloader - only 1000bp windows with at least one meth site
-meth_file = 'window_mean_HE1_chrm11_iaN7_win10_step10_frag1000.txt'
+meth_file = 'window_mean_HE1_chrmall_iaall_win10_step10_frag1000.txt'
 dataset = DnaMethylation(meth_file)
 counts = torch.tensor(np.sum(dataset.meth, axis = 1))
 one_indices = torch.nonzero(counts).flatten().tolist()
@@ -97,7 +97,7 @@ class LSTMTagger(nn.Module):
 EMBEDDING_DIM = 50
 HIDDEN_DIM = 200
 LEARNING_RATE = 0.01
-EPOCHS = 300
+EPOCHS = 1000
 
 #train the model
 from sklearn.metrics import confusion_matrix
@@ -106,6 +106,8 @@ model = LSTMTagger(EMBEDDING_DIM, HIDDEN_DIM, len(dataset.uniq_oligos))
 CM=0
 loss_function = nn.NLLLoss(reduce=False)
 optimizer = optim.SGD(model.parameters(), lr=LEARNING_RATE)
+
+printer=0
 
 for epoch in range(EPOCHS):
     for j,(fragment_train, targets, weight) in enumerate(train_loader):
@@ -133,7 +135,9 @@ for epoch in range(EPOCHS):
 #        print()
 #        print('Confusion Matirx : ')
 #        print(CM)
-        print('- Sensitivity : ',(tp/(tp+fn))*100, '- Specificity : ',(tn/(tn+fp))*100, '- Precision: ',(tp/(tp+fp))*100)
+        if printer % 100 == 0:
+            print(' -Epoch: ', epoch, ' -Batch: ', j, ' -Loss: ', loss, ' -Accuracy: ',acc,' -Sensitivity: ',(tp/(tp+fn))*100, ' -Specificity: ',(tn/(tn+fp))*100, ' -Precision: ',(tp/(tp+fp))*100)
+        printer+=1
 #        print('- Specificity : ',(tn/(tn+fp))*100)
 #        print('- Precision: ',(tp/(tp+fp))*100)
 #        print('- NPV: ',(tn/(tn+fn))*100)
